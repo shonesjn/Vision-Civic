@@ -1,0 +1,78 @@
+# ==========================================================
+# Root .gitignore for Vision-Civic
+# ==========================================================
+
+# --- Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+*/venv/
+*/.venv/
+
+# --- Node / Frontend ---
+node_modules/
+*/node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# --- Python Cache & Bytecode ---
+__pycache__/
+*/__pycache__/
+*/**/__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Environment & Secret Keys ---
+.env
+.env.*
+*.env
+!.env.example
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS Artifacts ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Large Datasets, Model Weights & Media Files ---
+# GitHub rejects files > 100MB and warns on files > 50MB
+*.safetensors
+saved_clip_model/
+**/saved_clip_model/
+Garbahe/
+**/Garbahe/
+pothole_dataset/
+**/pothole_dataset/
+*.zip
+*.tar.gz
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.jpg
+*.jpeg
+*.png
+!Frontend/src/assets/*
+!Frontend/public/*
+temp_media/
+temp_videos/
+static_media/
+uploads/
+runs/
+**/runs/
+
+# --- Local runtime sync state ---
+*.tmp
+civicsense_live_state.json
