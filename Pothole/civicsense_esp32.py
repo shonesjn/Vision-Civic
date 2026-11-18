@@ -20,7 +20,7 @@ if not os.path.exists(VIDEO_PATH):
     VIDEO_PATH = SAMPLE_VIDEO
 
 ESP32_IP = "192.168.206.33"
-CONFIDENCE_THRESHOLD = 0.50
+CONFIDENCE_THRESHOLD = 0.58
 
 # =========================
 # LOAD MODEL
@@ -47,8 +47,9 @@ if not cap.isOpened():
 
 print("Video opened successfully.")
 
-# Keep track of current ESP32 state
+# Keep track of current ESP32 state and debounce
 pothole_state = False
+consec_detections = 0
 
 # =========================
 # PROCESS VIDEO
@@ -61,14 +62,42 @@ while True:
         print("Video finished.")
         break
 
+    fh, fw = frame.shape[:2]
+
     # Run YOLO detection
     results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)
-    pothole_found = len(results[0].boxes) > 0
+    valid_boxes = []
+
+    for box in results[0].boxes:
+        conf = float(box.conf[0])
+        xyxy = [int(v) for v in box.xyxy[0].tolist()]
+        bx1, by1, bx2, by2 = xyxy
+        bw = bx2 - bx1
+        bh = by2 - by1
+        bcy = (by1 + by2) / 2.0
+        area_ratio = (bw * bh) / float(fw * fh)
+
+        # Filter out sky/horizon/ceiling, tiny specks, vertical strips
+        if by2 < fh * 0.35 or bcy < fh * 0.30:
+            continue
+        if area_ratio < 0.002:
+            continue
+        if (bh / max(1, bw)) > 2.8:
+            continue
+
+        valid_boxes.append((xyxy, conf))
+
+    raw_found = len(valid_boxes) > 0
+    if raw_found:
+        consec_detections += 1
+    else:
+        consec_detections = max(0, consec_detections - 1)
+
+    pothole_found = consec_detections >= 3
 
     if pothole_found:
-        for box in results[0].boxes:
-            confidence = float(box.conf[0])
-            print(f"Pothole detected | Confidence: {confidence:.2f}")
+        for xyxy, confidence in valid_boxes:
+            print(f"Pothole confirmed | Confidence: {confidence:.2f}")
 
     # =========================
     # SEND SIGNAL ONLY WHEN STATE CHANGES

@@ -67,7 +67,7 @@ if not os.path.exists(CLIP_DIR):
     CLIP_DIR = os.path.join(BASE_DIR, "Garbahe", "saved_clip_model")
 
 # Thresholds (calibrated for high accuracy & zero false alarms on CPU)
-CONF_POTHOLE = 0.45
+CONF_POTHOLE = 0.58
 CONF_FIRE_SMOKE = 0.45
 CONF_CLIP_OVERFLOW = 0.42
 
@@ -448,12 +448,31 @@ def run_unified_system(
                 do_pothole = (not is_live_cam) or (frame_idx % 2 == 0)
                 do_fire_smoke = (not is_live_cam) or (frame_idx % 2 == 1)
 
+                fh, fw = frame.shape[:2]
+
                 if do_pothole:
                     p_res = pothole_model.predict(frame, conf=CONF_POTHOLE, imgsz=480, verbose=False)[0]
                     last_pothole_boxes = []
                     for box in p_res.boxes:
                         conf = float(box.conf[0])
                         xyxy = [int(v) for v in box.xyxy[0].tolist()]
+                        bx1, by1, bx2, by2 = xyxy
+                        bw = bx2 - bx1
+                        bh = by2 - by1
+                        bcy = (by1 + by2) / 2.0
+                        area_ratio = (bw * bh) / float(fw * fh)
+
+                        # False positive rejection filters:
+                        # 1. Road surface ROI: reject sky, ceiling, trees, upper horizon
+                        if by2 < fh * 0.35 or bcy < fh * 0.30:
+                            continue
+                        # 2. Min area: reject tiny speck noise (<0.2% of frame)
+                        if area_ratio < 0.002:
+                            continue
+                        # 3. Aspect ratio: reject ultra-vertical strips (poles/trees/seams)
+                        if (bh / max(1, bw)) > 2.8:
+                            continue
+
                         last_pothole_boxes.append((xyxy, conf))
                     last_pothole_detected = len(last_pothole_boxes) > 0
 
@@ -485,16 +504,18 @@ def run_unified_system(
                 clip_conf = clip_data.get("conf", 0.0)
 
                 # -------------------------------------------------------------
-                # 4. Debounce & Stability Verification
+                # 4. Debounce & Stability Verification (Only update on active inference)
                 # -------------------------------------------------------------
-                consec["pothole"] = (consec["pothole"] + 1) if last_pothole_detected else max(0, consec["pothole"] - 1)
-                consec["fire"] = (consec["fire"] + 1) if last_fire_detected else max(0, consec["fire"] - 1)
-                consec["smoke"] = (consec["smoke"] + 1) if last_smoke_detected else max(0, consec["smoke"] - 1)
+                if do_pothole:
+                    consec["pothole"] = (consec["pothole"] + 1) if last_pothole_detected else max(0, consec["pothole"] - 1)
+                if do_fire_smoke:
+                    consec["fire"] = (consec["fire"] + 1) if last_fire_detected else max(0, consec["fire"] - 1)
+                    consec["smoke"] = (consec["smoke"] + 1) if last_smoke_detected else max(0, consec["smoke"] - 1)
                 consec["overflow"] = (consec["overflow"] + 1) if raw_overflow else max(0, consec["overflow"] - 1)
 
-                pothole_detected = consec["pothole"] >= 2
-                fire_detected = consec["fire"] >= 2
-                smoke_detected = consec["smoke"] >= 2
+                pothole_detected = consec["pothole"] >= 3
+                fire_detected = consec["fire"] >= 3
+                smoke_detected = consec["smoke"] >= 3
                 overflow_detected = consec["overflow"] >= 2
                 pothole_count = len(last_pothole_boxes) if pothole_detected else 0
 

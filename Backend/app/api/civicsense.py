@@ -21,12 +21,16 @@ WORKSPACE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 SCRIPT_PATH = os.path.join(WORKSPACE_DIR, "Pothole", "civicsense_all_in_one.py")
 STATE_FILE = os.path.join(WORKSPACE_DIR, "Pothole", "civicsense_live_state.json")
 
-POTHOLE_VENV_PYTHON = os.path.join(WORKSPACE_DIR, "Pothole", ".venv", "Scripts", "python.exe")
+GLOBAL_PYTHON = r"C:\Users\samsung\AppData\Local\Programs\Python\Python310\python.exe"
 BACKEND_VENV_PYTHON = os.path.join(WORKSPACE_DIR, "Backend", "venv", "Scripts", "python.exe")
-if os.path.exists(POTHOLE_VENV_PYTHON):
-    PYTHON_EXE = POTHOLE_VENV_PYTHON
+POTHOLE_VENV_PYTHON = os.path.join(WORKSPACE_DIR, "Pothole", ".venv", "Scripts", "python.exe")
+
+if os.path.exists(GLOBAL_PYTHON):
+    PYTHON_EXE = GLOBAL_PYTHON
 elif os.path.exists(BACKEND_VENV_PYTHON):
     PYTHON_EXE = BACKEND_VENV_PYTHON
+elif os.path.exists(POTHOLE_VENV_PYTHON):
+    PYTHON_EXE = POTHOLE_VENV_PYTHON
 else:
     PYTHON_EXE = sys.executable
 

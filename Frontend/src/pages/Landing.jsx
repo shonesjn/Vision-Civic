@@ -65,6 +65,7 @@ export default function Landing() {
   const [isLoadingAction, setIsLoadingAction] = useState(false);
   const [simulateMenuOpen, setSimulateMenuOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [backendConnected, setBackendConnected] = useState(true);
   const pollTimerRef = useRef(null);
   const lastSoundPlayedRef = useRef(0);
 
@@ -110,6 +111,7 @@ export default function Landing() {
     try {
       const res = await civicsenseApi.getStatus();
       if (res.data) {
+        setBackendConnected(true);
         setEngineState((prev) => ({
           ...prev,
           ...res.data,
@@ -120,6 +122,7 @@ export default function Landing() {
       }
     } catch {
       // Backend temporarily unreachable; preserve existing telemetry
+      setBackendConnected(false);
     }
   }, [triggerAudioChime]);
 
@@ -270,6 +273,12 @@ export default function Landing() {
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
                     STANDBY
+                  </span>
+                )}
+                {!backendConnected && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                    <AlertCircle size={11} />
+                    Backend Offline
                   </span>
                 )}
               </div>

@@ -57,16 +57,31 @@ class PotholeDetector(BaseDetector):
             }
 
         try:
-            results = self.custom_model(frame, imgsz=480, conf=0.45, verbose=False)
+            fh, fw = frame.shape[:2]
+            results = self.custom_model(frame, imgsz=480, conf=0.55, verbose=False)
             best_det = None
             max_conf = 0.0
 
             for r in results:
                 for box in r.boxes:
                     conf = float(box.conf[0].item())
-                    if conf >= 0.45 and conf > max_conf:
-                        max_conf = conf
+                    if conf >= 0.55 and conf > max_conf:
                         xyxy = [int(v) for v in box.xyxy[0].tolist()]
+                        bx1, by1, bx2, by2 = xyxy
+                        bw = bx2 - bx1
+                        bh = by2 - by1
+                        bcy = (by1 + by2) / 2.0
+                        area_ratio = (bw * bh) / float(fw * fh)
+
+                        # Suppress false positives: upper frame / specks / vertical slits
+                        if by2 < fh * 0.35 or bcy < fh * 0.30:
+                            continue
+                        if area_ratio < 0.002:
+                            continue
+                        if (bh / max(1, bw)) > 2.8:
+                            continue
+
+                        max_conf = conf
                         best_det = {
                             "detected": True,
                             "type": "POTHOLE",
