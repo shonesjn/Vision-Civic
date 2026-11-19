@@ -27,6 +27,83 @@ import threading
 import requests
 import cv2
 
+# ==============================================================================
+# WHATSAPP ALERT (Non-blocking background thread dispatcher)
+# ==============================================================================
+def _send_whatsapp_in_thread(incident_type: str, confidence: float, source: str):
+    """
+    Sends a WhatsApp alert via Twilio for a confirmed incident.
+    Loads credentials from Backend/.env or environment variables.
+    Runs in a daemon thread so it never blocks the detection loop.
+    """
+    try:
+        # Load .env from Backend directory if present
+        _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Backend", ".env")
+        _twilio_sid = ""
+        _twilio_token = ""
+        _from_num = ""
+        _to_num = ""
+        if os.path.exists(_env_path):
+            with open(_env_path, "r", encoding="utf-8") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line.startswith("TWILIO_ACCOUNT_SID="):
+                        _twilio_sid = _line.split("=", 1)[1].strip()
+                    elif _line.startswith("TWILIO_AUTH_TOKEN="):
+                        _twilio_token = _line.split("=", 1)[1].strip()
+                    elif _line.startswith("TWILIO_WHATSAPP_FROM="):
+                        _from_num = _line.split("=", 1)[1].strip()
+                    elif _line.startswith("ADMIN_WHATSAPP_TO="):
+                        _to_num = _line.split("=", 1)[1].strip()
+
+        # Fallback to environment variables
+        _twilio_sid   = _twilio_sid   or os.environ.get("TWILIO_ACCOUNT_SID", "")
+        _twilio_token = _twilio_token or os.environ.get("TWILIO_AUTH_TOKEN", "")
+        _from_num     = _from_num     or os.environ.get("TWILIO_WHATSAPP_FROM", "")
+        _to_num       = _to_num       or os.environ.get("ADMIN_WHATSAPP_TO", "")
+
+        if not all([_twilio_sid, _twilio_token, _from_num, _to_num]):
+            print("⚠️  [WhatsApp] Skipped: Missing Twilio credentials in Backend/.env")
+            return
+
+        from twilio.rest import Client as _TwilioClient
+        import datetime as _dt
+
+        _emoji = {"POTHOLE": "🕳️", "FIRE": "🔥", "SMOKE": "🌫️", "WASTE_BIN_OVERFLOW": "🗑️"}.get(incident_type, "⚠️")
+        _label = {"POTHOLE": "Pothole Detected", "FIRE": "Fire Detected", "SMOKE": "Smoke Detected", "WASTE_BIN_OVERFLOW": "Waste Bin Overflow"}.get(incident_type, incident_type)
+        _time_str = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _src_name = os.path.basename(str(source)) if str(source) != "0" else "Live Camera"
+
+        _body = (
+            f"{_emoji} *Vision Civic — Incident Alert*\n\n"
+            f"*Type:* {_label}\n"
+            f"*Confidence:* {confidence * 100:.1f}%\n"
+            f"📷 *Source:* {_src_name}\n"
+            f"*Detected At:* {_time_str}\n\n"
+            f"_Please review the Vision Civic dashboard immediately._"
+        )
+
+        _client = _TwilioClient(_twilio_sid, _twilio_token)
+        _msg = _client.messages.create(
+            from_=f"whatsapp:{_from_num}",
+            to=f"whatsapp:{_to_num}",
+            body=_body,
+        )
+        print(f"📲 [WhatsApp] Alert sent for {incident_type} → SID: {_msg.sid}")
+
+    except Exception as _e:
+        print(f"❌ [WhatsApp] Failed to send alert: {_e}")
+
+
+def send_whatsapp_alert_bg(incident_type: str, confidence: float, source: str):
+    """Fire-and-forget WhatsApp alert in a background daemon thread."""
+    _t = threading.Thread(
+        target=_send_whatsapp_in_thread,
+        args=(incident_type, confidence, source),
+        daemon=True
+    )
+    _t.start()
+
 print("\n" + "=" * 60)
 print(" 🛡️  CIVICSENSE UNIFIED AI SYSTEM STARTING...")
 print(" ⏳ Initializing AI engines (PyTorch & Transformers)...")
@@ -532,6 +609,7 @@ def run_unified_system(
                     })
                     last_incident_log_time["POTHOLE"] = now_t
                     print(f"📌 [INCIDENT LOGGED] Pothole Detected (Confidence: {best_c:.2f})")
+                    send_whatsapp_alert_bg("POTHOLE", best_c, source)
 
                 if fire_detected and (now_t - last_incident_log_time["FIRE"] > INCIDENT_COOLDOWN_SEC):
                     f_boxes = [b for b in last_fire_boxes if b[2] == "FIRE"]
@@ -544,6 +622,7 @@ def run_unified_system(
                     })
                     last_incident_log_time["FIRE"] = now_t
                     print(f"📌 [INCIDENT LOGGED] Fire Outbreak (Confidence: {f_c:.2f})")
+                    send_whatsapp_alert_bg("FIRE", f_c, source)
 
                 if smoke_detected and (now_t - last_incident_log_time["SMOKE"] > INCIDENT_COOLDOWN_SEC):
                     s_boxes = [b for b in last_fire_boxes if b[2] == "SMOKE"]
@@ -556,6 +635,7 @@ def run_unified_system(
                     })
                     last_incident_log_time["SMOKE"] = now_t
                     print(f"📌 [INCIDENT LOGGED] Smoke Cloud (Confidence: {s_c:.2f})")
+                    send_whatsapp_alert_bg("SMOKE", s_c, source)
 
                 if overflow_detected and (now_t - last_incident_log_time["WASTE_BIN_OVERFLOW"] > INCIDENT_COOLDOWN_SEC):
                     confirmed_incidents.append({
@@ -566,6 +646,7 @@ def run_unified_system(
                     })
                     last_incident_log_time["WASTE_BIN_OVERFLOW"] = now_t
                     print(f"📌 [INCIDENT LOGGED] Waste Bin Overflow (Confidence: {clip_conf:.2f})")
+                    send_whatsapp_alert_bg("WASTE_BIN_OVERFLOW", float(clip_conf), source)
 
                 # -------------------------------------------------------------
                 # 5. Trigger ESP32 Endpoints with Hysteresis & Debounce
