@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     PRE_EVENT_SECONDS: int = 5
     POST_EVENT_SECONDS: int = 5
 
+    # ── WhatsApp / Twilio Alert Settings ──────────────────────────────────────
+    # Twilio Account credentials (from https://console.twilio.com)
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN:  str = ""
+    # Twilio sandbox/production WhatsApp number  e.g. +14155238886
+    TWILIO_WHATSAPP_FROM: str = ""
+    # Admin's WhatsApp number (with country code)  e.g. +919876543210
+    ADMIN_WHATSAPP_TO: str = ""
+
     # Storage dirs for temp clips
     TEMP_DIR: str = "temp_media"
 

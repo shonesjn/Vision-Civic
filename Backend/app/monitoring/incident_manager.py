@@ -9,6 +9,7 @@ from app.monitoring.rolling_buffer import RollingBuffer
 from app.services.video_processor import save_snapshot, frames_to_video, draw_bounding_box
 from app.services.cloudinary_service import upload_image, upload_video
 from app.database.mongodb import get_database
+from app.services.whatsapp_alert import send_whatsapp_alert_async
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +298,11 @@ class LiveIncidentManager:
             # Set cooldown
             self.cooldowns[session.incident_type] = time.time() + settings.INCIDENT_COOLDOWN_SECONDS
             logger.info("[SAVED] Incident saved to DB: %s (ID: %s)", session.incident_type, incident_doc["_id"])
+
+            # ── WhatsApp Alert ─────────────────────────────────────────────────
+            # Fire-and-forget: send alert in background, never block incident flow
+            asyncio.create_task(send_whatsapp_alert_async(incident_doc))
+            # ──────────────────────────────────────────────────────────────────
 
             if self.on_incident_saved:
                 if asyncio.iscoroutinefunction(self.on_incident_saved):

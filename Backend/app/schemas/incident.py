@@ -8,11 +8,13 @@ class IncidentType(str, Enum):
     WASTE_BIN_OVERFLOW = "WASTE_BIN_OVERFLOW"
     FIRE = "FIRE"
     SMOKE = "SMOKE"
+    POTHOLE = "POTHOLE"  # ← added: pothole detection support
 
 
 class ModelType(str, Enum):
     WASTE_BIN = "waste_bin"
     FIRE_SMOKE = "fire_smoke"
+    POTHOLE = "pothole"  # ← added: pothole model type
 
 
 class SourceType(str, Enum):
